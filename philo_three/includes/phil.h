@@ -16,24 +16,28 @@
 #include <pthread.h>
 #include <semaphore.h>
  #include <sys/time.h>
+
 typedef struct	s_phil
 {
 	int id;
 	int nbr_meal;
 	pid_t pid;
+	int time_die;
 	long time_last_meal;
+	long start_time;
+	sem_t *print_sem;
+	sem_t *afork_sem;
 }				t_phil;
 
 typedef struct	s_central
 {
+	int dad;
 	int nbr_phil;
 	long start_time;
 	int nbr_meal_max;
 	int time_die;
 	int time_eat;
 	int time_sleep;
-	sem_t *print_sem;
-	sem_t *afork_sem;
 	t_phil **phil;
 }				t_central;
 int			ft_isnumber(char *str);
@@ -46,8 +50,8 @@ long	ft_get_time(long start_time);
 t_central		ft_create_t_central(int ac, char **av);
 t_central		*ft_malloc_t_central(int ac, char **av);
 void		ft_free_t_central(t_central *to_free);
-t_phil		ft_create_t_phil(int id);
-t_phil		*ft_malloc_t_phil(int id);
+t_phil		ft_create_t_phil(int id, int nbr_phil);
+t_phil		*ft_malloc_t_phil(int id, int nbr_phil);
 void		ft_free_t_phil(t_phil *to_free);
 void	ft_launch(t_central *central);
 #endif

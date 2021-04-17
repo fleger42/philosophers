@@ -55,50 +55,73 @@ void	ft_print_aphill(t_central *central)
 void	ft_sleep(t_central *central, t_phil *phil)
 {
 	(void)phil;
-	sem_wait(central->print_sem);
+	sem_wait(phil->print_sem);
 	printf("%ld %d is sleeping\n", ft_get_time(central->start_time), phil->id);
-	sem_post(central->print_sem);
+	sem_post(phil->print_sem);
 	usleep(central->time_sleep*1000);
 }
 
 void	ft_think(t_central *central, t_phil *phil)
 {
 	(void)phil;
-	sem_wait(central->print_sem);
+	sem_wait(phil->print_sem);
 	printf("%ld %d is thinking\n", ft_get_time(central->start_time), phil->id);
-	sem_post(central->print_sem);
+	sem_post(phil->print_sem);
 }
 
 void	ft_eat(t_central *central, t_phil *phil)
 {
 	(void)phil;
-	sem_wait(central->afork_sem);
-	sem_wait(central->print_sem);
+	sem_wait(phil->afork_sem);
+	sem_wait(phil->print_sem);
 	printf("%ld %d has taken a fork\n", ft_get_time(central->start_time), phil->id);
-	sem_post(central->print_sem);
+	sem_post(phil->print_sem);
 
-	sem_wait(central->afork_sem);
-	sem_wait(central->print_sem);
+	sem_wait(phil->afork_sem);
+	sem_wait(phil->print_sem);
 	printf("%ld %d is eating\n", ft_get_time(central->start_time), phil->id);;
 	phil->time_last_meal = ft_get_time(central->start_time);
-	sem_post(central->print_sem);
+	sem_post(phil->print_sem);
 	usleep(central->time_eat*1000);
-	sem_post(central->afork_sem);
-	sem_post(central->afork_sem);
+	sem_post(phil->afork_sem);
+	sem_post(phil->afork_sem);
+}
+
+void	*ft_thread(void *arg)
+{
+	t_phil *phil;
+
+	phil = arg;
+	while(ft_get_time(phil->start_time) - phil->time_last_meal < phil->time_die)
+	{
+		//printf("%d last meal %ld/%d\n", phil->id, ft_get_time(phil->start_time) - phil->time_last_meal, phil->time_die);
+		usleep(20);
+	}
+	sem_wait(phil->print_sem);
+	printf("%ld %d died\n", ft_get_time(phil->start_time), phil->id);
+	exit(0);
 }
 
 void	ft_action(t_central *central, t_phil *phil)
 {
-	while(ft_get_time(central->start_time) - phil->time_last_meal < central->time_die)
+	pthread_t process;
+
+	if (pthread_create(&process, NULL, ft_thread, phil) <  0)
 	{
-		printf("%d last meal %ld/%d\n", phil->id, ft_get_time(central->start_time) - phil->time_last_meal, central->time_die);
+		ft_putstr_fd("Error creating thread\n", 2);
+		exit(0);
+	}
+	pthread_detach(process);
+	printf("%d start his routine\n", phil->id);
+	while(1)
+	{
+		//printf("%d last meal %ld/%d\n", phil->id, ft_get_time(central->start_time) - phil->time_last_meal, central->time_die);
 		ft_eat(central, phil);
 		ft_sleep(central, phil);
 		ft_think(central, phil);
 	}
-	printf("Out\n");
-	(void)phil;
 }
+
 
 void	ft_create_child(t_central *central, t_phil *phil)
 {
@@ -112,14 +135,17 @@ void	ft_create_child(t_central *central, t_phil *phil)
 	}
 	if(pid == 0)
 	{
+		central->dad = 0;
+		phil->start_time = central->start_time;
+		phil->time_die = central->time_die;
 		ft_action(central, phil);
-		exit(0);
+		exit(1);
 	}
 	else
 	{
 		phil->pid = pid;
 	}
-	usleep(100);
+	usleep((central->time_eat  * (phil->id % 2)) / 2);
 }
 
 long	ft_get_time(long start_time)
@@ -133,7 +159,6 @@ long	ft_get_time(long start_time)
 }
 
 
-
 void	ft_launch(t_central *central)
 {
 	int i;
@@ -141,7 +166,7 @@ void	ft_launch(t_central *central)
 
 	pid = 0;
 	i = 0;
-	while(i < central->nbr_phil)
+	while(i < central->nbr_phil && central->dad)
 	{
 		ft_create_child(central, central->phil[i]);
 		i++;
@@ -156,15 +181,34 @@ void	ft_end(t_central *central)
 	i = 0;
 	while(i < central->nbr_phil)
 	{
-		waitpid(-1, &pid, 1);
-		if(WEXITSTATUS(pid) == 1)
+		waitpid(-1, &pid, 0);
+		if (WIFEXITED(pid))
+		{
+			pid = WEXITSTATUS(pid);
 			i++;
+		}
+		if(central->dad == 0)
+			exit(0);
+	}
+	
+}
+void	ft_kill(t_central *central)
+{
+	int i;
+
+	i = 0;
+	while(i < central->nbr_phil)
+	{
+		kill(central->phil[i]->pid, SIGTERM);
+		i++;
 	}
 }
+
 int     main(int ac, char **av)
 {
 	t_central *central;
 	int i;
+	int		stat_loc;
 
 	i = 0;
 	if(ft_verif(av, ac) == 1)
@@ -175,10 +219,8 @@ int     main(int ac, char **av)
     central = ft_malloc_t_central(ac, av);
 	sem_unlink("afork_sem");
 	sem_unlink("print_sem");
-	central->afork_sem = sem_open("afork_sem", O_RDWR | O_CREAT, 0664, central->nbr_phil);
-	central->print_sem = sem_open("print_sem", O_RDWR | O_CREAT, 0664, 1);
 	central->start_time = ft_get_time(0);
-	printf("Launch\n");
 	ft_launch(central);
-	ft_end(central);
+	waitpid(-1, &stat_loc, 0);
+	ft_kill(central);
 }

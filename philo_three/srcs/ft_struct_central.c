@@ -7,6 +7,7 @@ t_central		ft_create_t_central(int ac, char **av)
 
 	i = -1;
 	central.start_time = 0;
+	central.dad = 1;
 	central.nbr_phil = ft_atoi(av[1]);
 	central.time_die = ft_atoi(av[2]);
 	central.time_eat = ft_atoi(av[3]);
@@ -17,7 +18,7 @@ t_central		ft_create_t_central(int ac, char **av)
 		central.nbr_meal_max = -1;
 	central.phil = malloc(sizeof(t_phil*) * central.nbr_phil);
 	while(++i < central.nbr_phil)
-		central.phil[i] = ft_malloc_t_phil(i + 1);
+		central.phil[i] = ft_malloc_t_phil(i + 1, central.nbr_phil);
 	return (central);
 }
 
